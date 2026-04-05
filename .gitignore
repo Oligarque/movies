@@ -19,3 +19,7 @@ credentials.*
 # Build output and dependencies (root-level safety net)
 **/node_modules/
 **/dist/
+
+# BMAD framework sources (ignored per user preference)
+_bmad/
+
