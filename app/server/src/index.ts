@@ -2,6 +2,7 @@ import "dotenv/config";
 import cors from "cors";
 import express from "express";
 import { PrismaClient } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 
 const app = express();
 const prisma = new PrismaClient();
@@ -69,7 +70,7 @@ app.patch("/api/movies/reorder", async (req, res) => {
       return;
     }
 
-    const currentMovieIdSet = new Set(currentMovies.map((movie) => movie.id));
+    const currentMovieIdSet = new Set(currentMovies.map((movie: { id: number }) => movie.id));
     const requestedMovieIdSet = new Set(movieIds);
 
     for (const movieId of requestedMovieIdSet) {
@@ -192,7 +193,7 @@ app.patch("/api/movies/:id", async (req, res) => {
       return;
     }
 
-    const updatedMovie = await prisma.$transaction(async (tx) => {
+    const updatedMovie = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       if (hasRankChange) {
         if (targetRank < currentMovie.rank) {
           await tx.movie.updateMany({
@@ -297,7 +298,7 @@ app.post("/api/movies", async (req, res) => {
     const maxRank = maxRankResult._max.rank ?? 0;
     const insertionRank = Math.min(rank, maxRank + 1);
 
-    const createdMovie = await prisma.$transaction(async (tx) => {
+    const createdMovie = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.movie.updateMany({
         where: { rank: { gte: insertionRank } },
         data: { rank: { increment: 1 } },
@@ -382,7 +383,7 @@ app.get("/api/tmdb/search", async (req, res) => {
     });
 
     const libraryMap = new Map(
-      libraryMovies.map((m) => [m.tmdbId, m.rank])
+      libraryMovies.map((movie: { tmdbId: number; rank: number }) => [movie.tmdbId, movie.rank])
     );
 
     const enrichedMovies = await Promise.all(
