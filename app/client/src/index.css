@@ -1,0 +1,21 @@
+:root {
+  font-family: "Segoe UI", "Inter", Arial, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: linear-gradient(180deg, #f5f7fb 0%, #edf1f8 100%);
+  color: #111b2a;
+}
+
+#root {
+  min-height: 100vh;
+}
