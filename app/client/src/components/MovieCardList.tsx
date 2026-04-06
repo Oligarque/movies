@@ -8,7 +8,7 @@ interface MovieCardListProps {
   highlightMovieId: number | null
   dropTargetMovieId: number | null
   onOpenMovie: (movie: SortableMovie) => void
-  movieCardRefs: React.MutableRefObject<Map<number, HTMLElement>>
+  movieCardRefs: { current: Map<number, HTMLElement> }
 }
 
 const MovieCardList: React.FC<MovieCardListProps> = ({
