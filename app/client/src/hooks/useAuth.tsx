@@ -1,16 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { authService } from "../services/authService";
-
-type AuthContextValue = {
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  userId: number | null;
-  login: (password: string) => Promise<void>;
-  logout: () => Promise<void>;
-  refreshSession: () => Promise<void>;
-};
-
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+import { AuthContext, type AuthContextValue } from "./authContext";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -59,12 +49,4 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth(): AuthContextValue {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within AuthProvider");
-  }
-  return context;
 }
