@@ -1,160 +1,348 @@
 # Fiche de deploiement VPS Hostinger (Projet Movies)
 
-## 1. Option VPS a choisir
+Ce document est un runbook complet base sur le deploiement reel du projet.
 
-### Recommandation principale
-- Type: VPS KVM (pas hebergement mutualise)
-- OS: Ubuntu 24.04 LTS
-- Taille minimale confortable:
-  - 2 vCPU
-  - 4 Go RAM
-  - 80 Go NVMe SSD
-  - 1 IPv4 dediee
-- Sauvegardes:
-  - Snapshots actives
-  - Backup automatique (hebdomadaire minimum)
+## 0) Variables a adapter
 
-### Pourquoi ce choix
-- Suffisant pour Node.js + Nginx + PostgreSQL + PM2
-- Bon compromis cout/performance pour un MVP
-- Evolutif facilement sans migration lourde
+- IP VPS: `<VPS_IP>`
+- Frontend: `<FRONTEND_DOMAIN>`
+- API: `<API_DOMAIN>`
+- Repo: `<GIT_REPO_URL>`
 
-### Option budget (moins confortable)
-- 1 vCPU / 2 Go RAM peut fonctionner au debut
-- Risque de latence plus forte (API + DB + reverse proxy sur la meme machine)
+## 1) Prerequis et choix VPS
 
----
-
-## 2. Architecture recommandee sur le VPS
-
-- Nginx en frontal (reverse proxy + statique)
-- Backend Node/Express via PM2 sur port interne (ex: `4000`)
-- Frontend Vite build en statique servi par Nginx
-- Base de donnees PostgreSQL (locale VPS ou managée)
-- HTTPS via Let's Encrypt
-
-### Domaines conseilles
-- `example.com` ou `www.example.com` -> Frontend
-- `api.example.com` -> Backend
-
----
-
-## 3. Etapes de configuration (ordre conseille)
-
-## Etape A - Initialisation serveur
-1. Connexion SSH en root (premiere connexion)
-2. Mise a jour systeme:
-   - `apt update && apt upgrade -y`
-3. Creer un utilisateur admin non-root (ex: `deploy`)
-4. Ajouter ta cle SSH a cet utilisateur
-5. Durcir SSH:
-   - desactiver login root
-   - desactiver auth par mot de passe
-   - garder auth par cle uniquement
-
-## Etape B - Securite de base
-1. Configurer firewall UFW:
-   - autoriser `22`, `80`, `443`
-   - refuser le reste
-2. Installer et activer `fail2ban`
-3. Verifier timezone et synchronisation horaire (NTP)
-
-## Etape C - Installer la stack applicative
-1. Installer `nginx`
-2. Installer Node.js LTS (recommande: 22.x)
-3. Installer PM2 globalement (`npm i -g pm2`)
-4. Installer `git`
-5. Installer PostgreSQL 16 (si DB locale)
-6. Installer Certbot + plugin Nginx
-
-## Etape D - Deploiement du code
-1. Cloner le repository dans `/var/www/movies`
-2. Installer les dependances:
-   - backend: `app/server`
-   - frontend: `app/client`
-3. Backend:
-   - definir variables d'environnement
-   - build
-   - lancement via PM2
-4. Frontend:
-   - configurer URL API prod
-   - build Vite
-   - publier le dossier `dist` pour Nginx
-
-## Etape E - Variables d'environnement
-
-### Backend (`app/server/.env`)
-- `NODE_ENV=production`
-- `PORT=4000`
-- `DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/movies`
-- `TMDB_API_KEY=...`
-- `CORS_ORIGIN=https://example.com`
-
-### Frontend (build-time)
-- `VITE_API_BASE_URL=https://api.example.com`
-
-## Etape F - Base de donnees
-1. Creer base + utilisateur dedie
-2. Donner les droits minimum necessaires
-3. Lancer migrations Prisma en production
-4. Seed uniquement si besoin
-
-## Etape G - Nginx
-1. Virtual host Frontend:
-   - root vers le `dist`
-   - fallback SPA: `try_files $uri /index.html`
-2. Virtual host API:
-   - `proxy_pass http://127.0.0.1:4000`
-   - transmettre les headers proxy standards
-
-## Etape H - HTTPS
-1. Configurer les enregistrements DNS A vers l'IP du VPS
-2. Executer Certbot pour frontend + API
-3. Activer redirection HTTP -> HTTPS
-
-## Etape I - Auto-demarrage
-1. `pm2 save`
-2. `pm2 startup`
-3. `systemctl enable nginx`
-4. Tester un reboot serveur
-
-## Etape J - Verification finale
-1. Frontend accessible en HTTPS
-2. `GET /api/health` repond `200`
-3. Recherche TMDb et ajout film fonctionnels
-4. Verification logs:
-   - `pm2 logs`
-   - `/var/log/nginx/error.log`
-
----
-
-## 4. Options Hostinger a activer
-
-- Backup automatique: ON
-- Monitoring ressources: ON
-- Snapshot avant toute mise a jour critique: OUI
-- IPv6: optionnel mais recommande si disponible
-
----
-
-## 5. Bonnes pratiques production (projet Movies)
-
-1. Eviter SQLite en production (preferer PostgreSQL)
-2. Ne jamais exposer `TMDB_API_KEY` dans le frontend
-3. Restreindre CORS au domaine frontend
-4. Mettre une rotation des logs
-5. Prevoir une procedure de rollback simple
-
----
-
-## 6. Check de choix rapide VPS
-
-Choisir cette config si tu veux etre serein des le debut:
+Configuration recommandee:
 - VPS KVM
 - Ubuntu 24.04 LTS
 - 2 vCPU
 - 4 Go RAM
 - 80 Go NVMe
-- Snapshot + backup auto
 
-C'est le meilleur point de depart pour ton app actuelle, sans surdimensionner inutilement.
+## 2) Initialisation serveur (root)
+
+Connexion:
+
+```bash
+ssh root@<VPS_IP>
+```
+
+Mise a jour systeme:
+
+```bash
+apt update && apt upgrade -y
+```
+
+Outils de base:
+
+```bash
+apt install -y curl git unzip ufw fail2ban nginx ca-certificates gnupg
+```
+
+## 3) Utilisateur deploy + SSH
+
+Creer utilisateur deploy:
+
+```bash
+adduser deploy
+usermod -aG sudo deploy
+id deploy
+```
+
+Configurer la cle publique SSH pour deploy:
+
+```bash
+mkdir -p /home/deploy/.ssh
+nano /home/deploy/.ssh/authorized_keys
+chown -R deploy:deploy /home/deploy/.ssh
+chmod 700 /home/deploy/.ssh
+chmod 600 /home/deploy/.ssh/authorized_keys
+```
+
+Test de connexion:
+
+```bash
+ssh deploy@<VPS_IP>
+```
+
+## 4) Firewall
+
+Depuis la session deploy:
+
+```bash
+sudo ufw allow OpenSSH
+sudo ufw allow 80
+sudo ufw allow 443
+sudo ufw --force enable
+sudo ufw status
+```
+
+## 5) Node.js, PM2, PostgreSQL
+
+Installer Node.js 22:
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt install -y nodejs
+node -v
+npm -v
+```
+
+Installer PM2:
+
+```bash
+sudo npm install -g pm2
+pm2 -v
+```
+
+Installer PostgreSQL:
+
+```bash
+sudo apt install -y postgresql postgresql-contrib
+sudo systemctl enable postgresql
+sudo systemctl start postgresql
+sudo systemctl status postgresql --no-pager
+```
+
+## 6) Base PostgreSQL (optionnel dans l'etat actuel)
+
+Note: le projet actuel est configure en SQLite dans `prisma/schema.prisma`.
+La base PostgreSQL peut etre preparee pour une migration future.
+
+Commandes de creation (si besoin):
+
+```bash
+sudo -u postgres psql
+```
+
+Dans psql:
+
+```sql
+CREATE ROLE movies_user LOGIN PASSWORD 'mot_de_passe_fort';
+CREATE DATABASE movies OWNER movies_user;
+\q
+```
+
+## 7) Recuperation du projet
+
+Correction permissions `/var/www` (important, deja rencontre):
+
+```bash
+cd ~
+sudo mkdir -p /var/www
+sudo chown -R deploy:deploy /var/www
+```
+
+Clone + install:
+
+```bash
+cd /var/www
+git clone <GIT_REPO_URL>
+cd /var/www/movies
+npm --prefix app/server install
+npm --prefix app/client install
+```
+
+## 8) Configuration backend (.env)
+
+Dans l'etat actuel (SQLite):
+
+```bash
+cd /var/www/movies/app/server
+cat > .env <<'EOF'
+DATABASE_URL="file:./dev.db"
+TMDB_API_KEY="TA_CLE_TMDB"
+PORT=4000
+NODE_ENV=production
+CORS_ORIGIN=https://<FRONTEND_DOMAIN>
+EOF
+```
+
+Generer prisma + migrations + build:
+
+```bash
+npx prisma generate
+npx prisma migrate deploy
+npm run build
+```
+
+## 9) Demarrage backend PM2
+
+Important: le build sort sur `dist/src/index.js` (pas `dist/index.js`).
+
+```bash
+pm2 delete movies-api 2>/dev/null || true
+pm2 start "node /var/www/movies/app/server/dist/src/index.js" --name movies-api
+pm2 save
+pm2 startup
+pm2 status
+curl -i http://127.0.0.1:4000/api/health
+```
+
+## 10) Configuration frontend build
+
+```bash
+cd /var/www/movies/app/client
+cat > .env.production <<'EOF'
+VITE_API_BASE_URL=https://<API_DOMAIN>
+VITE_ENABLE_VIRTUALIZED_LIST=false
+VITE_VIRTUALIZATION_THRESHOLD=300
+EOF
+npm run build
+```
+
+## 11) Nginx (front + api)
+
+Frontend vhost:
+
+```bash
+sudo tee /etc/nginx/sites-available/movies-front >/dev/null <<'EOF'
+server {
+    listen 80;
+    server_name <FRONTEND_DOMAIN>;
+
+    root /var/www/movies/app/client/dist;
+    index index.html;
+
+    location / {
+        try_files $uri /index.html;
+    }
+}
+EOF
+```
+
+API vhost:
+
+```bash
+sudo tee /etc/nginx/sites-available/movies-api >/dev/null <<'EOF'
+server {
+    listen 80;
+    server_name <API_DOMAIN>;
+
+    location / {
+        proxy_pass http://127.0.0.1:4000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+EOF
+```
+
+Activation + reload:
+
+```bash
+sudo ln -sf /etc/nginx/sites-available/movies-front /etc/nginx/sites-enabled/movies-front
+sudo ln -sf /etc/nginx/sites-available/movies-api /etc/nginx/sites-enabled/movies-api
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+## 12) DNS + HTTPS
+
+DNS Hostinger a creer:
+- `A <front-subdomain>` -> `<VPS_IP>`
+- `A <api-subdomain>` -> `<VPS_IP>`
+
+Verifier propagation:
+
+```bash
+dig +short <FRONTEND_DOMAIN> A
+dig +short <API_DOMAIN> A
+```
+
+Installer certbot et certificats:
+
+```bash
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d <FRONTEND_DOMAIN> -d <API_DOMAIN>
+```
+
+Verifier renouvellement:
+
+```bash
+systemctl status certbot.timer --no-pager
+sudo certbot renew --dry-run
+```
+
+## 13) Verifications finales
+
+```bash
+curl -I https://<FRONTEND_DOMAIN>
+curl -I https://<API_DOMAIN>/api/health
+pm2 status
+pm2 logs movies-api --lines 50
+```
+
+## 14) Procedure de redeploiement
+
+```bash
+cd /var/www/movies
+git pull
+
+npm --prefix app/server install
+npm --prefix app/client install
+
+cd /var/www/movies/app/server
+npx prisma generate
+npx prisma migrate deploy
+npm run build
+
+cd /var/www/movies/app/client
+npm run build
+
+pm2 restart movies-api --update-env
+sudo systemctl reload nginx
+```
+
+## 15) Depannage rapide
+
+### Erreur PM2: `Cannot find module ... dist/index.js`
+
+Cause: mauvais chemin de build.
+
+Fix:
+
+```bash
+pm2 delete movies-api
+pm2 start "node /var/www/movies/app/server/dist/src/index.js" --name movies-api
+pm2 save
+```
+
+### Erreur Prisma: `@prisma/client did not initialize yet`
+
+Fix:
+
+```bash
+cd /var/www/movies/app/server
+npx prisma generate
+npx prisma migrate deploy
+npm run build
+pm2 restart movies-api --update-env
+```
+
+### Certbot: `NXDOMAIN`
+
+Cause: DNS pas encore propagé ou enregistrement absent.
+
+Fix:
+
+```bash
+dig +short <FRONTEND_DOMAIN> A
+dig +short <API_DOMAIN> A
+```
+
+Puis relancer certbot quand les IP sont resolues.
+
+## 16) Securite
+
+- Regenerer toute cle API exposee en clair (TMDB).
+- Mettre a jour `.env` puis:
+
+```bash
+pm2 restart movies-api --update-env
+```
+
+- Ne jamais commiter de fichiers `.env` en git.
