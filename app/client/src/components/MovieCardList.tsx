@@ -4,6 +4,7 @@ import SortableMovieCard, { type SortableMovie } from './SortableMovieCard'
 interface MovieCardListProps {
   movies: SortableMovie[]
   isDragDisabled?: boolean
+  hideDragHandle?: boolean
   highlightMovieId: number | null
   dropTargetMovieId: number | null
   onOpenMovie: (movie: SortableMovie) => void
@@ -13,6 +14,7 @@ interface MovieCardListProps {
 const MovieCardList: React.FC<MovieCardListProps> = ({
   movies,
   isDragDisabled = false,
+  hideDragHandle = false,
   highlightMovieId,
   dropTargetMovieId,
   onOpenMovie,
@@ -32,6 +34,7 @@ const MovieCardList: React.FC<MovieCardListProps> = ({
           }}
           movie={movie}
           isDragDisabled={isDragDisabled}
+          hideDragHandle={hideDragHandle}
           isHighlighted={highlightMovieId === movie.id}
           isDropTarget={dropTargetMovieId === movie.id}
           onOpen={onOpenMovie}

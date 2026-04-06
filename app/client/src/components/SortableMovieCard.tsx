@@ -20,6 +20,7 @@ export type SortableMovie = {
 interface SortableMovieCardProps {
   movie: SortableMovie
   isDragDisabled?: boolean
+  hideDragHandle?: boolean
   isHighlighted?: boolean
   isDropTarget?: boolean
   onOpen: (movie: SortableMovie) => void
@@ -27,7 +28,7 @@ interface SortableMovieCardProps {
 }
 
 const SortableMovieCard = forwardRef<HTMLElement, SortableMovieCardProps>(
-  ({ movie, isDragDisabled = false, isHighlighted = false, isDropTarget = false, onOpen, registerCardRef }, forwardedRef) => {
+  ({ movie, isDragDisabled = false, hideDragHandle = false, isHighlighted = false, isDropTarget = false, onOpen, registerCardRef }, forwardedRef) => {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
       useSortable({
         id: movie.id,
@@ -50,6 +51,9 @@ const SortableMovieCard = forwardRef<HTMLElement, SortableMovieCardProps>(
       onOpen(movie)
     }
 
+    const releaseYear = movie.releaseDate?.slice(0, 4)?.trim()
+    const hasValidYear = typeof releaseYear === 'string' && /^\d{4}$/.test(releaseYear)
+
     return (
       <article
         ref={combinedRef}
@@ -57,6 +61,8 @@ const SortableMovieCard = forwardRef<HTMLElement, SortableMovieCardProps>(
           isDropTarget ? 'dropTarget' : ''
         } ${
           isHighlighted ? 'duplicateHighlight' : ''
+        } ${
+          hideDragHandle ? 'noDragHandle' : ''
         }`}
         style={{
           transform: CSS.Transform.toString(transform),
@@ -71,18 +77,20 @@ const SortableMovieCard = forwardRef<HTMLElement, SortableMovieCardProps>(
         role="button"
         tabIndex={0}
       >
-        <button
-          type="button"
-          className="dragHandle"
-          aria-label={`Déplacer ${movie.title}`}
-          {...attributes}
-          {...listeners}
-          onClick={(event) => {
-            event.stopPropagation()
-          }}
-        >
-          ⋮⋮
-        </button>
+        {!hideDragHandle ? (
+          <button
+            type="button"
+            className="dragHandle"
+            aria-label={`Déplacer ${movie.title}`}
+            {...attributes}
+            {...listeners}
+            onClick={(event) => {
+              event.stopPropagation()
+            }}
+          >
+            ⋮⋮
+          </button>
+        ) : null}
 
         <div className="rank">#{movie.rank}</div>
         <img
@@ -96,6 +104,7 @@ const SortableMovieCard = forwardRef<HTMLElement, SortableMovieCardProps>(
         <div className="movieInfo">
           <h2>{movie.title}</h2>
           <p>{movie.directorName ?? 'Realisateur inconnu'}</p>
+          <p>{hasValidYear ? releaseYear : 'Annee inconnue'}</p>
         </div>
       </article>
     )
