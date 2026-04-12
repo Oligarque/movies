@@ -118,7 +118,7 @@ export const AddMovieFlow: React.FC<AddMovieFlowProps> = ({
       setIsLoading(true)
       try {
         const response = await fetch(
-          apiUrl(`/api/tmdb/search?query=${encodeURIComponent(searchQuery)}`)
+          apiUrl(`/movies-api/tmdb/search?query=${encodeURIComponent(searchQuery)}`)
         )
         if (!response.ok) {
           throw new Error('Search failed')
@@ -166,7 +166,7 @@ export const AddMovieFlow: React.FC<AddMovieFlowProps> = ({
     setSubmitError(null)
 
     try {
-      const response = await fetch(apiUrl('/api/movies'), {
+      const response = await fetch(apiUrl('/movies-api/movies'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -353,3 +353,4 @@ export const AddMovieFlow: React.FC<AddMovieFlowProps> = ({
 }
 
 export default AddMovieFlow
+

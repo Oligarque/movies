@@ -42,11 +42,11 @@ async function fetchTmdbMovieDetails(tmdbApiKey: string, tmdbId: number) {
 app.use(cors({ origin: true }));
 app.use(express.json());
 
-app.get("/api/health", (_req, res) => {
+app.get("/movies-api/health", (_req, res) => {
   res.json({ ok: true });
 });
 
-app.patch("/api/movies/reorder", async (req, res) => {
+app.patch("/movies-api/movies/reorder", async (req, res) => {
   const { movieIds } = req.body as { movieIds?: number[] };
 
   if (!Array.isArray(movieIds) || movieIds.length === 0) {
@@ -115,7 +115,7 @@ app.patch("/api/movies/reorder", async (req, res) => {
   }
 });
 
-app.get("/api/movies", async (_req, res) => {
+app.get("/movies-api/movies", async (_req, res) => {
   const movies = await prisma.movie.findMany({
     orderBy: { rank: "asc" },
     select: {
@@ -137,7 +137,7 @@ app.get("/api/movies", async (_req, res) => {
   res.json(movies);
 });
 
-app.patch("/api/movies/:id", async (req, res) => {
+app.patch("/movies-api/movies/:id", async (req, res) => {
   const movieId = parseInt(req.params.id, 10);
   const { lastWatchedAt, reviewText, rank } = req.body as {
     lastWatchedAt?: string | null;
@@ -254,7 +254,7 @@ app.patch("/api/movies/:id", async (req, res) => {
   }
 });
 
-app.post("/api/movies", async (req, res) => {
+app.post("/movies-api/movies", async (req, res) => {
   const { tmdbId, title, posterUrl, directorName, releaseDate, synopsis, rank } = req.body as {
     tmdbId?: number;
     title?: string;
@@ -325,7 +325,7 @@ app.post("/api/movies", async (req, res) => {
   }
 });
 
-app.get("/api/tmdb/search", async (req, res) => {
+app.get("/movies-api/tmdb/search", async (req, res) => {
   const { query } = req.query as { query?: string };
 
   if (!query || query.trim() === "") {
@@ -428,3 +428,4 @@ app.listen(port, () => {
   // eslint-disable-next-line no-console
   console.log(`Server listening on http://localhost:${port}`);
 });
+

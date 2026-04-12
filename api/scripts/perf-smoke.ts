@@ -35,8 +35,8 @@ const summarize = (metric: Metric) => {
 
 async function main() {
   const endpoints: Array<{ name: string; path: string; runs: number }> = [
-    { name: "GET /api/movies", path: "/api/movies", runs: 8 },
-    { name: "GET /api/tmdb/search?query=in", path: "/api/tmdb/search?query=in", runs: 5 },
+    { name: "GET /movies-api/movies", path: "/movies-api/movies", runs: 8 },
+    { name: "GET /movies-api/tmdb/search?query=in", path: "/movies-api/tmdb/search?query=in", runs: 5 },
   ];
 
   const metrics: Metric[] = [];
@@ -65,3 +65,4 @@ main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
+

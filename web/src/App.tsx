@@ -70,7 +70,7 @@ function App() {
       setIsLoading(true)
       setHasError(false)
 
-      const response = await fetch(apiUrl('/api/movies'))
+      const response = await fetch(apiUrl('/movies-api/movies'))
       if (!response.ok) {
         throw new Error('Failed to load movies')
       }
@@ -102,7 +102,7 @@ function App() {
         previousMovie !== undefined &&
         updates.rank !== previousMovie.rank
 
-      const response = await fetch(apiUrl(`/api/movies/${movieId}`), {
+      const response = await fetch(apiUrl(`/movies-api/movies/${movieId}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
@@ -140,7 +140,7 @@ function App() {
   }
 
   const persistMovieOrder = async (orderedMovies: MovieCard[]) => {
-    const response = await fetch(apiUrl('/api/movies/reorder'), {
+    const response = await fetch(apiUrl('/movies-api/movies/reorder'), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ movieIds: orderedMovies.map((movie) => movie.id) }),
