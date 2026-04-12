@@ -5,13 +5,17 @@ import { getSessionExpiry, isSessionExpired, SESSION_DURATION_MS } from "../util
 
 const prisma = new PrismaClient();
 
+const cookieDomain = process.env.COOKIE_DOMAIN?.trim();
+
 const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
-  sameSite: "strict" as const,
+  // Lax is enough for same-site subdomains and avoids strict-cookie edge cases.
+  sameSite: "lax" as const,
   maxAge: SESSION_DURATION_MS,
   // Must match auth controller cookie path for clearCookie/refresh to work reliably.
   path: "/",
+  ...(cookieDomain ? { domain: cookieDomain } : {}),
 };
 
 export async function sessionLoader(req: Request, res: Response, next: NextFunction) {
