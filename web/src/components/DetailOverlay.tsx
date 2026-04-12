@@ -21,6 +21,7 @@ interface DetailOverlayProps {
   isOpen: boolean
   onClose: () => void
   maxRank: number
+  isReadOnly?: boolean
   onSave?: (movieId: number, updates: { lastWatchedAt?: string | null; reviewText?: string; rank?: number }) => Promise<void>
 }
 
@@ -29,6 +30,7 @@ export const DetailOverlay: React.FC<DetailOverlayProps> = ({
   isOpen,
   onClose,
   maxRank,
+  isReadOnly = false,
   onSave,
 }) => {
   const modalRef = useRef<HTMLDivElement>(null)
@@ -88,9 +90,11 @@ export const DetailOverlay: React.FC<DetailOverlayProps> = ({
     }
   }
 
+  const formattedLastWatched = editLastWatchedAt || 'Non renseigne'
+
   // Handle Save
   const handleSave = async () => {
-    if (!movie || !onSave) return
+    if (!movie || !onSave || isReadOnly) return
 
     setIsSaving(true)
     setSaveError(null)
@@ -183,74 +187,86 @@ export const DetailOverlay: React.FC<DetailOverlayProps> = ({
             </div>
           )}
 
-          {/* Editable Fields Section */}
-          <div className="editableSection">
-            <div className="formGroup">
-              <label htmlFor="movieRank" className="formLabel">
-                Rang:
-              </label>
-              <input
-                id="movieRank"
-                type="number"
-                className="dateInput"
-                value={editRank}
-                onChange={(e) => {
-                  const value = Number.parseInt(e.target.value, 10)
-                  if (Number.isFinite(value)) {
-                    setEditRank(value)
-                  }
-                }}
-                min={1}
-                max={maxRank}
-                disabled={isSaving}
-              />
-              <small className="rankHelpText">Entre 1 et {maxRank}</small>
+          {isReadOnly ? (
+            <div className="editableSection">
+              <div className="formGroup">
+                <span className="formLabel">Regarde le:</span>
+                <p>{formattedLastWatched}</p>
+              </div>
+              <div className="formGroup">
+                <span className="formLabel">Critique:</span>
+                <p>{editReviewText.trim() || 'Aucune critique'}</p>
+              </div>
             </div>
+          ) : (
+            <div className="editableSection">
+              <div className="formGroup">
+                <label htmlFor="movieRank" className="formLabel">
+                  Rang:
+                </label>
+                <input
+                  id="movieRank"
+                  type="number"
+                  className="dateInput"
+                  value={editRank}
+                  onChange={(e) => {
+                    const value = Number.parseInt(e.target.value, 10)
+                    if (Number.isFinite(value)) {
+                      setEditRank(value)
+                    }
+                  }}
+                  min={1}
+                  max={maxRank}
+                  disabled={isSaving}
+                />
+                <small className="rankHelpText">Entre 1 et {maxRank}</small>
+              </div>
 
-            <div className="formGroup">
-              <label htmlFor="lastWatchedAt" className="formLabel">
-                Regardé le:
-              </label>
-              <input
-                id="lastWatchedAt"
-                type="date"
-                className="dateInput"
-                value={editLastWatchedAt}
-                onChange={(e) => setEditLastWatchedAt(e.target.value)}
+              <div className="formGroup">
+                <label htmlFor="lastWatchedAt" className="formLabel">
+                  Regardé le:
+                </label>
+                <input
+                  id="lastWatchedAt"
+                  type="date"
+                  className="dateInput"
+                  value={editLastWatchedAt}
+                  onChange={(e) => setEditLastWatchedAt(e.target.value)}
+                  disabled={isSaving}
+                />
+              </div>
+
+              <div className="formGroup">
+                <label htmlFor="reviewText" className="formLabel">
+                  Critique:
+                </label>
+                <textarea
+                  id="reviewText"
+                  className="reviewTextarea"
+                  value={editReviewText}
+                  onChange={(e) => setEditReviewText(e.target.value)}
+                  disabled={isSaving}
+                  rows={4}
+                  placeholder="Partage ton avis sur ce film..."
+                />
+              </div>
+
+              {/* Error Message */}
+              {saveError && (
+                <p className="errorMessage">{saveError}</p>
+              )}
+
+              {/* Save Button */}
+              <button
+                className="saveButton"
+                onClick={handleSave}
                 disabled={isSaving}
-              />
+                title="Save changes (Ctrl+S)"
+              >
+                {isSaving ? 'Enregistrement...' : 'Enregistrer'}
+              </button>
             </div>
-
-            <div className="formGroup">
-              <label htmlFor="reviewText" className="formLabel">
-                Critique:
-              </label>
-              <textarea
-                id="reviewText"
-                className="reviewTextarea"
-                value={editReviewText}
-                onChange={(e) => setEditReviewText(e.target.value)}
-                disabled={isSaving}
-                rows={4}
-                placeholder="Partage ton avis sur ce film..."
-              />
-            </div>
-
-            {/* Error Message */}
-            {saveError && (
-              <p className="errorMessage">{saveError}</p>
-            )}
-
-            {/* Save Button */}
-            <button
-              className="saveButton"
-              onClick={handleSave}
-              disabled={isSaving}
-              title="Save changes (Ctrl+S)"
-            >
-              {isSaving ? 'Enregistrement...' : 'Enregistrer'}
-            </button>
-          </div>
+          )}
         </div>
       </div>
     </div>

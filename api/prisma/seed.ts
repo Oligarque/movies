@@ -1,4 +1,11 @@
+import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+dotenv.config({
+  path: resolve(dirname(fileURLToPath(import.meta.url)), "../.env"),
+});
 
 const prisma = new PrismaClient();
 
@@ -61,6 +68,37 @@ const seedMovies = [
 ];
 
 async function main() {
+  // ============ CREATE INITIAL ADMIN USER ============
+  const existingUser = await prisma.user.findFirst();
+  const targetPasswordHash = process.env.ADMIN_PASSWORD_HASH?.trim();
+  const forcePasswordReset = process.env.FORCE_ADMIN_PASSWORD_RESET === "true";
+
+  if (!targetPasswordHash) {
+    throw new Error(
+      "ADMIN_PASSWORD_HASH is required. Set it in your shell before running prisma seed."
+    );
+  }
+
+  if (existingUser) {
+    if (forcePasswordReset) {
+      await prisma.user.update({
+        where: { id: existingUser.id },
+        data: { password: targetPasswordHash },
+      });
+      console.log("✅ Forced admin password reset from seed configuration.");
+    } else {
+      console.log("ℹ️  Admin user already exists. Password unchanged.");
+    }
+  } else {
+    // Create new user
+    const user = await prisma.user.create({
+      data: {
+        password: targetPasswordHash,
+      },
+    });
+    console.log("✅ Created initial admin user:", user.id);
+  }
+  // ============ SEED MOVIES ============
   for (const movie of seedMovies) {
     await prisma.movie.upsert({
       where: { tmdbId: movie.tmdbId },
@@ -77,6 +115,7 @@ async function main() {
       },
     });
   }
+  console.log("✅ Seeded movies completed.");
 }
 
 main()

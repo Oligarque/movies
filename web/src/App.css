@@ -26,6 +26,20 @@
   flex-grow: 1;
 }
 
+.demoModeBadge {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #ffd08a;
+  background: #fff4dd;
+  color: #8a4f00;
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
 .addMovieButton {
   flex-shrink: 0;
   padding: 10px 16px;
@@ -277,6 +291,10 @@
   line-height: 1.35;
 }
 
+.movieCard.noDragHandle {
+  grid-template-columns: 60px 92px 1fr;
+}
+
 .movieInfo p {
   margin: 4px 0 0;
   color: #606a78;
@@ -292,6 +310,10 @@
     grid-template-columns: 30px 46px 72px 1fr;
     gap: 10px;
     padding: 8px;
+  }
+
+  .movieCard.noDragHandle {
+    grid-template-columns: 46px 72px 1fr;
   }
 
   .virtualListViewport {

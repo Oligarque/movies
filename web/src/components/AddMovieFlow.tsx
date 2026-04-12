@@ -10,6 +10,20 @@ interface AddMovieFlowProps {
   maxRank: number
   onMovieAdded?: (payload: { movieId: number; rank: number; title: string }) => Promise<void> | void
   onDuplicateMovie?: (payload: { movieId: number; rank: number | null; title: string }) => void
+  onAddMovieLocal?: (payload: {
+    movie: SearchResult
+    rank: number
+  }) => {
+    status: 'added'
+    movieId: number
+    rank: number
+    title: string
+  } | {
+    status: 'duplicate'
+    movieId: number
+    rank: number | null
+    title: string
+  }
 }
 
 export const AddMovieFlow: React.FC<AddMovieFlowProps> = ({
@@ -18,6 +32,7 @@ export const AddMovieFlow: React.FC<AddMovieFlowProps> = ({
   maxRank,
   onMovieAdded,
   onDuplicateMovie,
+  onAddMovieLocal,
 }) => {
   const maxInsertionRank = maxRank + 1
   const getDefaultRank = useCallback(() => {
@@ -118,7 +133,7 @@ export const AddMovieFlow: React.FC<AddMovieFlowProps> = ({
       setIsLoading(true)
       try {
         const response = await fetch(
-          apiUrl(`/movies-api/tmdb/search?query=${encodeURIComponent(searchQuery)}`)
+          apiUrl(`/api/tmdb/search?query=${encodeURIComponent(searchQuery)}`)
         )
         if (!response.ok) {
           throw new Error('Search failed')
@@ -166,9 +181,37 @@ export const AddMovieFlow: React.FC<AddMovieFlowProps> = ({
     setSubmitError(null)
 
     try {
-      const response = await fetch(apiUrl('/movies-api/movies'), {
+      if (onAddMovieLocal) {
+        const localResult = onAddMovieLocal({
+          movie: selectedResult,
+          rank: safeRank,
+        })
+
+        if (localResult.status === 'duplicate') {
+          onDuplicateMovie?.({
+            movieId: localResult.movieId,
+            rank: localResult.rank,
+            title: localResult.title,
+          })
+          resetFormState()
+          onClose()
+          return
+        }
+
+        await onMovieAdded?.({
+          movieId: localResult.movieId,
+          rank: localResult.rank,
+          title: localResult.title,
+        })
+        resetFormState()
+        onClose()
+        return
+      }
+
+      const response = await fetch(apiUrl('/api/movies'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           tmdbId: selectedResult.tmdbId,
           title: selectedResult.title,
@@ -353,4 +396,3 @@ export const AddMovieFlow: React.FC<AddMovieFlowProps> = ({
 }
 
 export default AddMovieFlow
-

@@ -1,8 +1,11 @@
 import "dotenv/config";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import express from "express";
 import { PrismaClient } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
+import { authController } from "./controllers/authController.js";
+import { requireAuth, sessionLoader } from "./middleware/session.js";
 
 const app = express();
 const prisma = new PrismaClient();
@@ -39,14 +42,20 @@ async function fetchTmdbMovieDetails(tmdbApiKey: string, tmdbId: number) {
   return (await response.json()) as TmdbMovieDetails;
 }
 
-app.use(cors({ origin: true }));
+app.use(cors({ origin: true, credentials: true }));
+app.use(cookieParser());
 app.use(express.json());
+app.use(sessionLoader);
 
-app.get("/movies-api/health", (_req, res) => {
+app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
 });
 
-app.patch("/movies-api/movies/reorder", async (req, res) => {
+app.post("/api/auth/login", authController.login);
+app.post("/api/auth/logout", authController.logout);
+app.get("/api/auth/me", authController.me);
+
+app.patch("/api/movies/reorder", requireAuth, async (req, res) => {
   const { movieIds } = req.body as { movieIds?: number[] };
 
   if (!Array.isArray(movieIds) || movieIds.length === 0) {
@@ -115,7 +124,7 @@ app.patch("/movies-api/movies/reorder", async (req, res) => {
   }
 });
 
-app.get("/movies-api/movies", async (_req, res) => {
+app.get("/api/movies", async (_req, res) => {
   const movies = await prisma.movie.findMany({
     orderBy: { rank: "asc" },
     select: {
@@ -137,8 +146,9 @@ app.get("/movies-api/movies", async (_req, res) => {
   res.json(movies);
 });
 
-app.patch("/movies-api/movies/:id", async (req, res) => {
-  const movieId = parseInt(req.params.id, 10);
+app.patch("/api/movies/:id", requireAuth, async (req, res) => {
+  const movieIdParam = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const movieId = Number.parseInt(movieIdParam ?? "", 10);
   const { lastWatchedAt, reviewText, rank } = req.body as {
     lastWatchedAt?: string | null;
     reviewText?: string;
@@ -254,7 +264,7 @@ app.patch("/movies-api/movies/:id", async (req, res) => {
   }
 });
 
-app.post("/movies-api/movies", async (req, res) => {
+app.post("/api/movies", requireAuth, async (req, res) => {
   const { tmdbId, title, posterUrl, directorName, releaseDate, synopsis, rank } = req.body as {
     tmdbId?: number;
     title?: string;
@@ -325,7 +335,49 @@ app.post("/movies-api/movies", async (req, res) => {
   }
 });
 
-app.get("/movies-api/tmdb/search", async (req, res) => {
+app.get("/api/public/ranking", async (req, res) => {
+  const limitParam = typeof req.query.limit === "string" ? req.query.limit : "100";
+  const offsetParam = typeof req.query.offset === "string" ? req.query.offset : "0";
+
+  const limit = Number.parseInt(limitParam, 10);
+  const offset = Number.parseInt(offsetParam, 10);
+
+  const safeLimit = Number.isInteger(limit) && limit > 0 ? Math.min(limit, 500) : 100;
+  const safeOffset = Number.isInteger(offset) && offset >= 0 ? offset : 0;
+
+  try {
+    const [movies, total] = await Promise.all([
+      prisma.movie.findMany({
+        select: {
+          id: true,
+          tmdbId: true,
+          title: true,
+          posterUrl: true,
+          directorName: true,
+          releaseDate: true,
+          synopsis: true,
+          rank: true,
+          lastWatchedAt: true,
+          reviewText: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        orderBy: { rank: "asc" },
+        take: safeLimit,
+        skip: safeOffset,
+      }),
+      prisma.movie.count(),
+    ]);
+
+    res.json({ movies, total });
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error("Error fetching public ranking:", error);
+    res.status(500).json({ error: "Failed to fetch ranking" });
+  }
+});
+
+app.get("/api/tmdb/search", async (req, res) => {
   const { query } = req.query as { query?: string };
 
   if (!query || query.trim() === "") {
@@ -428,4 +480,3 @@ app.listen(port, () => {
   // eslint-disable-next-line no-console
   console.log(`Server listening on http://localhost:${port}`);
 });
-

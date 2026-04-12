@@ -12,6 +12,41 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============ USER MANAGEMENT ============
+
+model User {
+  id        Int       @id @default(autoincrement())
+  /// Hashed password (bcrypt)
+  password  String
+  
+  sessions  Session[]
+  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  
+  @@map("users")
+}
+
+model Session {
+  id              String    @id @default(uuid())
+  userId          Int
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  /// When session expires (NOW + 14 days at creation, reset on activity)
+  expiresAt       DateTime
+  
+  /// Last time this session was used (for sliding window)
+  lastActivityAt  DateTime  @default(now())
+  
+  createdAt       DateTime  @default(now())
+  
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// ============ EXISTING MODELS (unchanged) ============
+
 model Movie {
   id           Int       @id @default(autoincrement())
   tmdbId       Int       @unique
