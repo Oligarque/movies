@@ -1,4 +1,6 @@
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') || ''
+const API_BASE =
+  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ||
+  (import.meta.env.PROD ? "https://api.rivierenathan.fr/movies-api" : "")
 
 export const apiUrl = (path: string): string => {
   if (path.startsWith('http://') || path.startsWith('https://')) {

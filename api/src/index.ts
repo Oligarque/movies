@@ -45,6 +45,16 @@ async function fetchTmdbMovieDetails(tmdbApiKey: string, tmdbId: number) {
 app.use(cors({ origin: true, credentials: true }));
 app.use(cookieParser());
 app.use(express.json());
+
+// Production nginx proxies movies API under /movies-api/*.
+// Rewrite that prefix to keep internal routes under /api/*.
+app.use((req, _res, next) => {
+  if (req.url.startsWith("/movies-api/")) {
+    req.url = req.url.replace(/^\/movies-api/, "");
+  }
+  next();
+});
+
 app.use(sessionLoader);
 
 app.get("/api/health", (_req, res) => {
