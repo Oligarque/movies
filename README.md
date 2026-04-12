@@ -22,3 +22,15 @@ cd web
 npm install
 npm run dev
 ```
+
+## Changement du mot de passe admin
+
+Pour modifier le mot de passe de `movies`, genere un nouveau hash bcrypt puis relance le seed avec `FORCE_ADMIN_PASSWORD_RESET=true`.
+Cela met a jour l'utilisateur admin sans reinitialiser la base de donnees.
+
+Exemple:
+
+```bash
+cd api
+ADMIN_PASSWORD_HASH="<hash bcrypt>" FORCE_ADMIN_PASSWORD_RESET=true npm run db:seed
+```
