@@ -5,6 +5,7 @@ import express from "express";
 import { PrismaClient } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import { authController } from "./controllers/authController.js";
+import { sendApiError } from "./lib/api-errors.js";
 import { requireAuth, sessionLoader } from "./middleware/session.js";
 
 const app = express();
@@ -58,7 +59,7 @@ app.use((req, _res, next) => {
 app.use(sessionLoader);
 
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true });
+  res.json({ ok: true, status: "ok", service: "movies-api" });
 });
 
 app.post("/api/auth/login", authController.login);
@@ -69,13 +70,13 @@ app.patch("/api/movies/reorder", requireAuth, async (req, res) => {
   const { movieIds } = req.body as { movieIds?: number[] };
 
   if (!Array.isArray(movieIds) || movieIds.length === 0) {
-    res.status(400).json({ error: "movieIds array is required" });
+    sendApiError(res, 400, { code: "INVALID_PAYLOAD", message: "movieIds array is required" });
     return;
   }
 
   const uniqueMovieIds = new Set(movieIds);
   if (uniqueMovieIds.size !== movieIds.length) {
-    res.status(400).json({ error: "movieIds must not contain duplicates" });
+    sendApiError(res, 400, { code: "INVALID_PAYLOAD", message: "movieIds must not contain duplicates" });
     return;
   }
 
@@ -85,7 +86,7 @@ app.patch("/api/movies/reorder", requireAuth, async (req, res) => {
     });
 
     if (currentMovies.length !== movieIds.length) {
-      res.status(400).json({ error: "movieIds must include every movie" });
+      sendApiError(res, 400, { code: "INVALID_PAYLOAD", message: "movieIds must include every movie" });
       return;
     }
 
@@ -94,7 +95,7 @@ app.patch("/api/movies/reorder", requireAuth, async (req, res) => {
 
     for (const movieId of requestedMovieIdSet) {
       if (!currentMovieIdSet.has(movieId)) {
-        res.status(400).json({ error: "movieIds contains an unknown movie id" });
+        sendApiError(res, 400, { code: "INVALID_PAYLOAD", message: "movieIds contains an unknown movie id" });
         return;
       }
     }
@@ -130,7 +131,7 @@ app.patch("/api/movies/reorder", requireAuth, async (req, res) => {
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("Error reordering movies:", error);
-    res.status(500).json({ error: "Failed to reorder movies" });
+    sendApiError(res, 500, { code: "REORDER_FAILED", message: "Failed to reorder movies" });
   }
 });
 
@@ -168,7 +169,7 @@ app.patch("/api/movies/:id", requireAuth, async (req, res) => {
   try {
     // Validate movieId
     if (isNaN(movieId)) {
-      res.status(400).json({ error: "Invalid movie ID" });
+      sendApiError(res, 400, { code: "INVALID_MOVIE_ID", message: "Invalid movie ID" });
       return;
     }
 
@@ -178,7 +179,7 @@ app.patch("/api/movies/:id", requireAuth, async (req, res) => {
     });
 
     if (!currentMovie) {
-      res.status(404).json({ error: "Movie not found" });
+      sendApiError(res, 404, { code: "MOVIE_NOT_FOUND", message: "Movie not found" });
       return;
     }
 
@@ -194,7 +195,7 @@ app.patch("/api/movies/:id", requireAuth, async (req, res) => {
     let targetRank = currentMovie.rank;
     if (rank !== undefined) {
       if (!Number.isInteger(rank) || rank < 1) {
-        res.status(400).json({ error: "Invalid rank" });
+        sendApiError(res, 400, { code: "INVALID_RANK", message: "Invalid rank" });
         return;
       }
 
@@ -209,7 +210,7 @@ app.patch("/api/movies/:id", requireAuth, async (req, res) => {
 
     // If no fields to update, return error
     if (Object.keys(updateData).length === 0 && !hasRankChange) {
-      res.status(400).json({ error: "No fields to update" });
+      sendApiError(res, 400, { code: "NO_FIELDS_TO_UPDATE", message: "No fields to update" });
       return;
     }
 
@@ -265,12 +266,12 @@ app.patch("/api/movies/:id", requireAuth, async (req, res) => {
     if (error instanceof Error && "code" in error) {
       // Prisma error
       if ((error as { code: string }).code === "P2025") {
-        res.status(404).json({ error: "Movie not found" });
+        sendApiError(res, 404, { code: "MOVIE_NOT_FOUND", message: "Movie not found" });
         return;
       }
     }
 
-    res.status(500).json({ error: "Failed to update movie" });
+    sendApiError(res, 500, { code: "UPDATE_MOVIE_FAILED", message: "Failed to update movie" });
   }
 });
 
@@ -293,7 +294,7 @@ app.post("/api/movies", requireAuth, async (req, res) => {
     !Number.isInteger(rank) ||
     rank < 1
   ) {
-    res.status(400).json({ error: "Invalid payload" });
+    sendApiError(res, 400, { code: "INVALID_PAYLOAD", message: "Invalid payload" });
     return;
   }
 
@@ -304,8 +305,9 @@ app.post("/api/movies", requireAuth, async (req, res) => {
     });
 
     if (existingMovie) {
-      res.status(409).json({
-        error: "Movie already exists in library",
+      sendApiError(res, 409, {
+        code: "MOVIE_ALREADY_EXISTS",
+        message: "Movie already exists in library",
         movieId: existingMovie.id,
         rank: existingMovie.rank,
       });
@@ -341,7 +343,7 @@ app.post("/api/movies", requireAuth, async (req, res) => {
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("Error creating movie:", error);
-    res.status(500).json({ error: "Failed to create movie" });
+    sendApiError(res, 500, { code: "CREATE_MOVIE_FAILED", message: "Failed to create movie" });
   }
 });
 
@@ -383,7 +385,7 @@ app.get("/api/public/ranking", async (req, res) => {
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("Error fetching public ranking:", error);
-    res.status(500).json({ error: "Failed to fetch ranking" });
+    sendApiError(res, 500, { code: "FETCH_RANKING_FAILED", message: "Failed to fetch ranking" });
   }
 });
 
@@ -391,14 +393,14 @@ app.get("/api/tmdb/search", async (req, res) => {
   const { query } = req.query as { query?: string };
 
   if (!query || query.trim() === "") {
-    res.status(400).json({ error: "Query parameter is required" });
+    sendApiError(res, 400, { code: "QUERY_REQUIRED", message: "Query parameter is required" });
     return;
   }
 
   try {
     const tmdbApiKey = process.env.TMDB_API_KEY;
     if (!tmdbApiKey) {
-      res.status(500).json({ error: "TMDb API key is missing" });
+      sendApiError(res, 500, { code: "TMDB_API_KEY_MISSING", message: "TMDb API key is missing" });
       return;
     }
 
@@ -412,8 +414,9 @@ app.get("/api/tmdb/search", async (req, res) => {
     const tmdbResponse = await fetch(tmdbUrl);
     if (!tmdbResponse.ok) {
       const errorText = await tmdbResponse.text();
-      res.status(502).json({
-        error: "Failed to search TMDb",
+      sendApiError(res, 502, {
+        code: "TMDB_SEARCH_FAILED",
+        message: "Failed to search TMDb",
         details: errorText,
       });
       return;
@@ -482,8 +485,25 @@ app.get("/api/tmdb/search", async (req, res) => {
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("Error searching TMDb:", error);
-    res.status(500).json({ error: "Failed to search TMDb" });
+    sendApiError(res, 500, { code: "SEARCH_TMDB_FAILED", message: "Failed to search TMDb" });
   }
+});
+
+app.use((_req, res) => {
+  sendApiError(res, 404, { code: "NOT_FOUND", message: "Route not found" });
+});
+
+app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if ((error as { message?: string } | undefined)?.message === "CORS_BLOCKED") {
+    sendApiError(res, 403, {
+      code: "CORS_BLOCKED",
+      message: "Origin not allowed.",
+      hint: "Check ALLOWED_ORIGINS configuration.",
+    });
+    return;
+  }
+
+  sendApiError(res, 500, { code: "INTERNAL_ERROR", message: "Unexpected server error." });
 });
 
 app.listen(port, () => {

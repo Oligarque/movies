@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import type { Request, Response } from "express";
+import { sendApiError } from "../lib/api-errors.js";
 import { verifyPassword } from "../utils/hash.js";
 import {
   clearFailedLoginAttempts,
@@ -15,7 +16,8 @@ const cookieOptions = {
   secure: process.env.NODE_ENV === "production",
   sameSite: "strict" as const,
   maxAge: SESSION_DURATION_MS,
-  path: "/api",
+  // Use root path so cookie is sent for both /api/* (dev) and /movies-api/api/* (prod proxy).
+  path: "/",
 };
 
 export const authController = {
@@ -23,8 +25,9 @@ export const authController = {
     try {
       const blockStatus = getLoginBlockStatus(req);
       if (blockStatus.blocked) {
-        res.status(429).json({
-          error: "Too many failed login attempts. Try again later.",
+        sendApiError(res, 429, {
+          code: "AUTH_RATE_LIMITED",
+          message: "Too many failed login attempts. Try again later.",
           retryAfterSeconds: blockStatus.retryAfterSeconds,
         });
         return;
@@ -33,7 +36,7 @@ export const authController = {
       const password = typeof req.body?.password === "string" ? req.body.password : "";
 
       if (!password.trim()) {
-        res.status(400).json({ error: "Password required" });
+        sendApiError(res, 400, { code: "PASSWORD_REQUIRED", message: "Password required" });
         return;
       }
 
@@ -42,7 +45,7 @@ export const authController = {
       });
 
       if (!user) {
-        res.status(500).json({ error: "System error" });
+        sendApiError(res, 500, { code: "SYSTEM_ERROR", message: "System error" });
         return;
       }
 
@@ -51,15 +54,17 @@ export const authController = {
         const failedAttemptResult = registerFailedLoginAttempt(req);
 
         if (failedAttemptResult.blocked) {
-          res.status(429).json({
-            error: "Too many failed login attempts. Locked for 12 hours.",
+          sendApiError(res, 429, {
+            code: "AUTH_LOCKED",
+            message: "Too many failed login attempts. Locked for 12 hours.",
             retryAfterSeconds: failedAttemptResult.retryAfterSeconds,
           });
           return;
         }
 
-        res.status(401).json({
-          error: "Invalid password",
+        sendApiError(res, 401, {
+          code: "INVALID_PASSWORD",
+          message: "Invalid password",
           remainingAttempts: failedAttemptResult.remainingAttempts,
         });
         return;
@@ -79,14 +84,14 @@ export const authController = {
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error("Login error:", error);
-      res.status(500).json({ error: "Login failed" });
+      sendApiError(res, 500, { code: "LOGIN_FAILED", message: "Login failed" });
     }
   },
 
   async logout(req: Request, res: Response) {
     try {
       if (!req.session) {
-        res.status(401).json({ error: "Not authenticated" });
+        sendApiError(res, 401, { code: "NOT_AUTHENTICATED", message: "Not authenticated" });
         return;
       }
 
@@ -99,13 +104,13 @@ export const authController = {
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error("Logout error:", error);
-      res.status(500).json({ error: "Logout failed" });
+      sendApiError(res, 500, { code: "LOGOUT_FAILED", message: "Logout failed" });
     }
   },
 
   async me(req: Request, res: Response) {
     if (!req.session) {
-      res.status(401).json({ error: "No valid session" });
+      sendApiError(res, 401, { code: "NO_VALID_SESSION", message: "No valid session" });
       return;
     }
 

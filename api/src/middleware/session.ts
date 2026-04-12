@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import type { NextFunction, Request, Response } from "express";
+import { sendApiError } from "../lib/api-errors.js";
 import { getSessionExpiry, isSessionExpired, SESSION_DURATION_MS } from "../utils/session.js";
 
 const prisma = new PrismaClient();
@@ -9,7 +10,8 @@ const cookieOptions = {
   secure: process.env.NODE_ENV === "production",
   sameSite: "strict" as const,
   maxAge: SESSION_DURATION_MS,
-  path: "/api",
+  // Must match auth controller cookie path for clearCookie/refresh to work reliably.
+  path: "/",
 };
 
 export async function sessionLoader(req: Request, res: Response, next: NextFunction) {
@@ -58,7 +60,7 @@ export async function sessionLoader(req: Request, res: Response, next: NextFunct
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session) {
-    res.status(401).json({ error: "Not authenticated" });
+    sendApiError(res, 401, { code: "NOT_AUTHENTICATED", message: "Not authenticated" });
     return;
   }
 
